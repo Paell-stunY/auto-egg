@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # ============================================================
-#   AUTO UPLOAD EGG - PTERODACTYL PANEL
-#   github.com/username/repo
+#    AUTO UPLOAD EGG - PTERODACTYL PANEL (REMOTE VERSION)
 # ============================================================
 
 RED='\033[0;31m'
@@ -12,98 +11,64 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Daftar URL Egg (Bisa ditambah sesuai kebutuhan)
+URLS=(
+    "https://raw.githubusercontent.com/Paell-stunY/auto-egg/refs/heads/main/egg/Egg_feellzStore.json"
+    "https://raw.githubusercontent.com/Paell-stunY/auto-egg/refs/heads/main/egg/egg-s-a--m-p--windows.json"
+    "https://raw.githubusercontent.com/Paell-stunY/auto-egg/refs/heads/main/egg/egg-samp.json"
+)
+
 clear
 echo -e "${CYAN}"
-echo "╔══════════════════════════════════════════════╗"
-echo "║     AUTO UPLOAD EGG - PTERODACTYL PANEL      ║"
-echo "╚══════════════════════════════════════════════╝"
+echo "  ╔══════════════════════════════════════════════╗"
+echo "  ║      AUTO UPLOAD EGG - REMOTE REPOSITORY     ║"
+echo "  ╚══════════════════════════════════════════════╝"
 echo -e "${NC}"
 
-# ─── CEK DEPENDENSI ─────────────────────────────────────────
+# --- CEK DEPENDENSI ---
 for dep in curl jq; do
     if ! command -v "$dep" &>/dev/null; then
         echo -e "${YELLOW}[INFO]${NC} Menginstall dependensi: $dep ..."
-        apt-get install -y "$dep" -qq 2>/dev/null || \
-        yum install -y "$dep" -q 2>/dev/null || \
-        { echo -e "${RED}[ERROR]${NC} Gagal install '$dep'. Install manual dulu."; exit 1; }
+        apt-get install -y "$dep" -qq 2>/dev/null || yum install -y "$dep" -q 2>/dev/null || { echo -e "${RED}[ERROR]${NC} Gagal install '$dep'."; exit 1; }
     fi
 done
 
-# ─── INPUT DARI USER ────────────────────────────────────────
-echo -e "${BOLD}Isi konfigurasi berikut:${NC}\n"
-
-# PANEL URL
-read -rp "$(echo -e "${CYAN}PANEL_URL${NC} (contoh: https://panel.domain.com) : ")" PANEL_URL
-while [[ -z "$PANEL_URL" ]]; do
-    echo -e "${RED}[!] PANEL_URL tidak boleh kosong.${NC}"
-    read -rp "$(echo -e "${CYAN}PANEL_URL${NC} : ")" PANEL_URL
-done
+# --- INPUT USER ---
+read -rp "$(echo -e "${CYAN}PANEL_URL${NC} (https://panel.xyz) : ")" PANEL_URL
 PANEL_URL="${PANEL_URL%/}"
-
-# API KEY
-read -rp "$(echo -e "${CYAN}API_KEY${NC}   (ptla_...) : ")" API_KEY
-while [[ -z "$API_KEY" ]]; do
-    echo -e "${RED}[!] API_KEY tidak boleh kosong.${NC}"
-    read -rp "$(echo -e "${CYAN}API_KEY${NC}   (ptla_...) : ")" API_KEY
-done
-
-# NEST ID
-read -rp "$(echo -e "${CYAN}NEST_ID${NC}   (default: 1) : ")" NEST_ID
+read -rp "$(echo -e "${CYAN}API_KEY${NC}   (ptla_...)         : ")" API_KEY
+read -rp "$(echo -e "${CYAN}NEST_ID${NC}   (default: 1)       : ")" NEST_ID
 NEST_ID="${NEST_ID:-1}"
 
-echo ""
-echo -e "${YELLOW}────────────────────────────────────────${NC}"
-echo -e " Panel URL : ${CYAN}${PANEL_URL}${NC}"
-echo -e " API Key   : ${CYAN}${API_KEY:0:10}**********${NC}"
-echo -e " Nest ID   : ${CYAN}${NEST_ID}${NC}"
-echo -e "${YELLOW}────────────────────────────────────────${NC}\n"
+echo -e "\n${BOLD}Menyiapkan upload untuk ${#URLS[@]} egg dari GitHub...${NC}\n"
 
-read -rp "$(echo -e "Lanjutkan upload? ${BOLD}[y/N]${NC} : ")" CONFIRM
-if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
-    echo -e "\n${RED}Dibatalkan.${NC}"
-    exit 0
-fi
-
-# ─── AMBIL SEMUA EGG DARI FOLDER ./egg/ ─────────────────────
-EGG_DIR="$(dirname "$0")/egg"
-
-if [[ ! -d "$EGG_DIR" ]]; then
-    echo -e "\n${RED}[ERROR]${NC} Folder 'egg/' tidak ditemukan di direktori ini."
-    exit 1
-fi
-
-mapfile -t EGG_FILES < <(find "$EGG_DIR" -maxdepth 1 -name "*.json" | sort)
-
-if [[ ${#EGG_FILES[@]} -eq 0 ]]; then
-    echo -e "\n${RED}[ERROR]${NC} Tidak ada file .json di dalam folder egg/"
-    exit 1
-fi
-
-echo -e "\n${BOLD}Ditemukan ${#EGG_FILES[@]} egg:${NC}"
-for f in "${EGG_FILES[@]}"; do
-    echo -e "  ${GREEN}•${NC} $(basename "$f")"
-done
-echo ""
-
-# ─── UPLOAD SATU PER SATU ───────────────────────────────────
 SUCCESS=0
 FAILED=0
-TOTAL=${#EGG_FILES[@]}
+TOTAL=${#URLS[@]}
 
-for i in "${!EGG_FILES[@]}"; do
-    FILE="${EGG_FILES[$i]}"
-    BASENAME=$(basename "$FILE")
+for i in "${!URLS[@]}"; do
+    URL="${URLS[$i]}"
+    FILENAME=$(basename "$URL")
     NUM=$((i + 1))
 
-    echo -e "${YELLOW}[${NUM}/${TOTAL}]${NC} Mengupload: ${CYAN}${BASENAME}${NC}"
+    echo -e "${YELLOW}[${NUM}/${TOTAL}]${NC} Mendownload & Mengupload: ${CYAN}${FILENAME}${NC}"
+
+    # Mengambil konten JSON ke memori dan langsung POST
+    # Gunakan --data-binary untuk menjaga struktur JSON agar tidak rusak
+    RESPONSE=$(curl -s -L "$URL")
+    
+    if [[ -z "$RESPONSE" ]]; then
+        echo -e "        ${RED}[GAGAL]${NC} Tidak bisa mengambil file dari GitHub."
+        ((FAILED++))
+        continue
+    fi
 
     HTTP_CODE=$(curl -s -o /tmp/_egg_resp.json -w "%{http_code}" \
-        -X POST \
-        "${PANEL_URL}/api/application/nests/${NEST_ID}/eggs/import" \
+        -X POST "${PANEL_URL}/api/application/nests/${NEST_ID}/eggs/import" \
         -H "Authorization: Bearer ${API_KEY}" \
         -H "Accept: application/json" \
         -H "Content-Type: application/json" \
-        -d @"${FILE}")
+        -d "$RESPONSE")
 
     if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "201" ]]; then
         EGG_ID=$(jq -r '.attributes.id // "?"' /tmp/_egg_resp.json 2>/dev/null)
@@ -114,18 +79,14 @@ for i in "${!EGG_FILES[@]}"; do
         echo -e "        ${RED}[GAGAL]${NC} HTTP ${HTTP_CODE} — ${ERR}"
         ((FAILED++))
     fi
-
     sleep 1
 done
 
-# ─── RINGKASAN ───────────────────────────────────────────────
-echo ""
-echo -e "${CYAN}════════════════════════════════════${NC}"
-echo -e "  ${BOLD}Selesai!${NC}"
-echo -e "  ${GREEN}Sukses : ${SUCCESS}${NC}"
-echo -e "  ${RED}Gagal  : ${FAILED}${NC}"
+# --- RINGKASAN ---
+echo -e "\n${CYAN}════════════════════════════════════${NC}"
+echo -e "  Sukses : ${GREEN}${SUCCESS}${NC}"
+echo -e "  Gagal  : ${RED}${FAILED}${NC}"
 echo -e "  Total  : ${TOTAL}"
 echo -e "${CYAN}════════════════════════════════════${NC}\n"
 
 rm -f /tmp/_egg_resp.json
-exit 0
